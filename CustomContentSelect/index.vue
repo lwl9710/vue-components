@@ -36,7 +36,7 @@ const props = withDefaults(defineProps<Props>(), {
   placeholder: "",
   width: "auto",
   options: () => [],
-  filterMethod: (v, d) => d()
+  filterMethod: (v: string, d: (options?: Option[]) => void) => d()
 });
 const inputRef = ref<HTMLInputElement>();
 const inputValueRef = ref<HTMLDivElement>();
