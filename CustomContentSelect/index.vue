@@ -6,6 +6,7 @@ import { Option } from "./type";
 type StringNumber = string | number;
 interface Props {
   modelValue?:  StringNumber | Array<StringNumber>
+  disabled?: boolean
   width?: string
   filterable?: boolean
   clearable?: boolean
@@ -16,7 +17,7 @@ interface Props {
 }
 
 interface Emits {
-  (e: "update:modelValue", value: StringNumber | Array<StringNumber>): void
+  (e: "update:modelValue" | "change", value: StringNumber | Array<StringNumber>): void
 }
 
 interface State {
@@ -28,6 +29,7 @@ interface State {
 
 const emits = defineEmits<Emits>();
 const props = withDefaults(defineProps<Props>(), {
+  disabled: false,
   clearable: false,
   filterable: false,
   multiple: false,
@@ -120,10 +122,11 @@ const onClickChangeChecked = (option: Option) => {
     } else {
       arr.push(option);
     }
+    emits("update:modelValue", arr.map(option => option.value));
   } else {
     arr = [option];
+    emits("update:modelValue", arr[0].value);
   }
-  emits("update:modelValue", arr.map(option => option.value));
 }
 
 const onClickTriggerFocus = () => {
@@ -182,7 +185,20 @@ watch(() => state.selectValue, () => {
 }, { deep: true });
 
 watch(() => props.modelValue, () => {
-  reloadSelectValue();
+  if(props.multiple) {
+    const newValues = state.selectValue.map(item => item.value);
+    const values = (props.modelValue as StringNumber[]) || []
+    if((newValues.length !== values.length) || !values.every(v => newValues.includes(v))) {
+      reloadSelectValue();
+      emits("change", values);
+    }
+  } else {
+    const value = state.selectValue[0]?.value || "";
+    if(props.modelValue !== value) {
+      reloadSelectValue();
+      emits("change", state.selectValue[0]?.value);
+    }
+  }
 }, { deep: true });
 
 onMounted(() => {
@@ -194,12 +210,12 @@ onMounted(() => {
 });
 </script>
 <template>
-<div class="custom-content-select" :class="{'is-focus': state.showDropdown}"  :style="{width: props.width}">
+<div class="custom-content-select" :class="{'is-focus': state.showDropdown, disabled: props.disabled}"  :style="{width: props.width}">
   <SelectDropdown ref="selectDropdownRef" v-model="state.showDropdown" :width="state.dropdownWidth" :multiple="props.multiple">
     <div class="select-trigger" :class="{clearable: props.clearable}" ref="selectTriggerRef" @click="onClickTriggerFocus">
       <div class="input-value" ref="inputValueRef">
         <div v-if="props.multiple" class="tags">
-          <el-tag type="info" v-for="(option, index) in state.selectValue" closable :key="index" @close="onCloseTag(index)">
+          <el-tag type="info" v-for="(option, index) in state.selectValue" :closable="!props.disabled" :key="index" @close="onCloseTag(index)">
             <slot name="content" :option="option">
               {{ option.label }}
             </slot>
@@ -213,6 +229,7 @@ onMounted(() => {
         <div v-if="props.filterable" class="input-wrapper">
           <input
             type="text"
+            :disabled="props.disabled"
             @input="onFilter"
             @blur="onInputBlur"
             ref="filterInputRef"
@@ -226,6 +243,7 @@ onMounted(() => {
       <div class="input-box">
         <input
           readonly
+          :disabled="props.disabled"
           type="text"
           class="input"
           ref="inputRef"
@@ -262,7 +280,7 @@ onMounted(() => {
             <slot name="content" v-bind="props"></slot>
           </template>
         </CustomContentSelectOptions>
-        <div v-else class="custom-content-select-empty">搜索中...</div>
+        <div v-else class="custom-content-select-empty">加载中</div>
       </template>
       <CustomContentSelectOptions
         v-else
@@ -298,6 +316,14 @@ onMounted(() => {
       .icon-wrapper.icon-arrow {
         transform: rotateZ(180deg);
       }
+    }
+  }
+  &.disabled {
+    background-color: #f5f7fa;
+    box-shadow: 0 0 0 1px var(--el-disabled-border-color) inset;
+    cursor: not-allowed;
+    .input-box .input, .input-wrapper .input {
+      cursor: not-allowed;
     }
   }
   .input {
